@@ -1,0 +1,49 @@
+name: TestBudget demo
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  testbudget:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out fixture repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate TestBudget plan
+        if: github.event_name == 'pull_request'
+        uses: ssbajjur-ncstate/SE-CSC-510-Group-9@7f8445a603aa0461326796e1cbc3587bb76ae75a
+        with:
+          mode: plan
+          base-ref: ${{ github.base_ref }}
+          budget: "0.25"
+          links: fixtures/test_links.json
+          db: testbudget.db
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install fixture project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run complete suite in audit mode
+        run: |
+          python -m pytest -q --junitxml=junit.xml
+
+      - name: Ingest results
+        if: always() && hashFiles('junit.xml') != ''
+        uses: ssbajjur-ncstate/SE-CSC-510-Group-9@7f8445a603aa0461326796e1cbc3587bb76ae75a
+        with:
+          mode: ingest
+          junit-path: junit.xml
+          db: testbudget.db
